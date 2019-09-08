@@ -29,6 +29,7 @@ class AccessToken implements AccessTokenInterface, ArrayAccess, JsonSerializable
      */
     public function __construct(array $attributes)
     {
+        var_dump($attributes);
         if (empty($attributes['access_token'])) {
             throw new InvalidArgumentException('The key "access_token" could not be empty.');
         }

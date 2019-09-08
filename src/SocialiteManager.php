@@ -13,8 +13,9 @@ namespace Overtrue\Socialite;
 
 use Closure;
 use InvalidArgumentException;
-use Symfony\Component\HttpFoundation\Request;
-use Symfony\Component\HttpFoundation\Session\Session;
+use EasySwoole\Http\Request;
+use EasySwoole\Http\Response;
+
 
 /**
  * Class SocialiteManager.
@@ -34,6 +35,11 @@ class SocialiteManager implements FactoryInterface
      * @var Request
      */
     protected $request;
+
+    /**
+     * @var Response
+     */
+    protected $response;
 
     /**
      * The registered custom driver creators.
@@ -73,19 +79,16 @@ class SocialiteManager implements FactoryInterface
      * SocialiteManager constructor.
      *
      * @param array        $config
-     * @param Request|null $request
+     * @param Request $request
+     * @param Response $response
      */
-    public function __construct(array $config, Request $request = null)
+    public function __construct(array $config, Request $request,Response $response)
     {
+
         $this->config = new Config($config);
 
-        if ($this->config->has('guzzle')) {
-            Providers\AbstractProvider::setGuzzleOptions($this->config->get('guzzle'));
-        }
-
-        if ($request) {
-            $this->setRequest($request);
-        }
+        $this->setRequest($request);
+        $this->setResponse($response);
     }
 
     /**
@@ -119,7 +122,7 @@ class SocialiteManager implements FactoryInterface
     }
 
     /**
-     * @param \Symfony\Component\HttpFoundation\Request $request
+     * @param Request $request
      *
      * @return $this
      */
@@ -131,11 +134,31 @@ class SocialiteManager implements FactoryInterface
     }
 
     /**
-     * @return \Symfony\Component\HttpFoundation\Request
+     * @return  Request
      */
     public function getRequest()
     {
         return $this->request ?: $this->createDefaultRequest();
+    }
+
+    /**
+     * @param Response $response
+     *
+     * @return $this
+     */
+    public function setResponse(Response $response)
+    {
+        $this->response = $response;
+
+        return $this;
+    }
+
+    /**
+     * @return  Response
+     */
+    public function getResponse()
+    {
+        return $this->response;
     }
 
     /**
@@ -182,12 +205,13 @@ class SocialiteManager implements FactoryInterface
      */
     protected function createDefaultRequest()
     {
-        $request = Request::createFromGlobals();
-        $session = new Session();
 
-        $request->setSession($session);
+        //$request = Request::createFromGlobals();
+        //$session = new Session();
 
-        return $request;
+        //$request->setSession($session);
+
+        return $this->request;
     }
 
     /**
@@ -227,6 +251,7 @@ class SocialiteManager implements FactoryInterface
     {
         return new $provider(
             $this->getRequest(),
+            $this->getResponse(),
             $config['client_id'],
             $config['client_secret'],
             $config['redirect']

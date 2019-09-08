@@ -21,12 +21,11 @@ PHP >= 7.0
 # Installation
 
 ```shell
-$ composer require "overtrue/socialite" -vvv
+$ composer require "xbing2002/socialite"
 ```
 
 # Usage
 
-For Laravel 5: [overtrue/laravel-socialite](https://github.com/overtrue/laravel-socialite)
 
 `authorize.php`:
 

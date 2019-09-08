@@ -11,23 +11,23 @@
 
 namespace Overtrue\Socialite\Providers;
 
-use GuzzleHttp\Client;
-use GuzzleHttp\ClientInterface;
+use easySwoole\Cache\Cache;
+use EasySwoole\Http\Response;
+use EasySwoole\HttpClient\HttpClient;
 use Overtrue\Socialite\AccessToken;
 use Overtrue\Socialite\AccessTokenInterface;
 use Overtrue\Socialite\AuthorizeFailedException;
 use Overtrue\Socialite\InvalidStateException;
 use Overtrue\Socialite\ProviderInterface;
-use Symfony\Component\HttpFoundation\RedirectResponse;
-use Symfony\Component\HttpFoundation\Request;
+use EasySwoole\Http\Request;
 
 /**
- * Class AbstractProvider.
+ * Class SessionDriverInterface.
  */
 abstract class AbstractProvider implements ProviderInterface
 {
     /**
-     * Provider name.
+     * AbstractProvider name.
      *
      * @var string
      */
@@ -36,9 +36,16 @@ abstract class AbstractProvider implements ProviderInterface
     /**
      * The HTTP request instance.
      *
-     * @var \Symfony\Component\HttpFoundation\Request
+     * @var Request
      */
     protected $request;
+
+    /**
+     * The HTTP response instance.
+     *
+     * @var Request
+     */
+    protected $response;
 
     /**
      * The client ID.
@@ -108,20 +115,29 @@ abstract class AbstractProvider implements ProviderInterface
      */
     protected static $guzzleOptions = ['http_errors' => false];
 
+    /** @var SessionDriver */
+    protected $session;
+
     /**
      * Create a new provider instance.
      *
-     * @param \Symfony\Component\HttpFoundation\Request $request
+     * @param Request  $request
+     * @param Response $response
      * @param string                                    $clientId
      * @param string                                    $clientSecret
      * @param string|null                               $redirectUrl
      */
-    public function __construct(Request $request, $clientId, $clientSecret, $redirectUrl = null)
+    public function __construct(Request $request, Response $response, $clientId, $clientSecret, $redirectUrl = null)
     {
         $this->request = $request;
+        $this->response=$response;
         $this->clientId = $clientId;
         $this->clientSecret = $clientSecret;
         $this->redirectUrl = $redirectUrl;
+
+        $sessionManager= new SessionManager('file',$this->request,$this->response);
+        $this->session=$sessionManager->session();
+        $this->session->start();
     }
 
     /**
@@ -158,12 +174,13 @@ abstract class AbstractProvider implements ProviderInterface
      */
     abstract protected function mapUserToObject(array $user);
 
+
     /**
      * Redirect the user of the application to the provider's authentication screen.
      *
      * @param string $redirectUrl
      *
-     * @return \Symfony\Component\HttpFoundation\RedirectResponse
+     * @return string
      */
     public function redirect($redirectUrl = null)
     {
@@ -172,12 +189,12 @@ abstract class AbstractProvider implements ProviderInterface
         if (!is_null($redirectUrl)) {
             $this->redirectUrl = $redirectUrl;
         }
-
         if ($this->usesState()) {
             $state = $this->makeState();
         }
 
-        return new RedirectResponse($this->getAuthUrl($state));
+        return $this->response->redirect($this->getAuthUrl($state));
+        //return new RedirectResponse($this->getAuthUrl($state));
     }
 
     /**
@@ -188,9 +205,7 @@ abstract class AbstractProvider implements ProviderInterface
         if (is_null($token) && $this->hasInvalidState()) {
             throw new InvalidStateException();
         }
-
         $token = $token ?: $this->getAccessToken($this->getCode());
-
         $user = $this->getUserByToken($token);
 
         $user = $this->mapUserToObject($user)->merge(['original' => $user]);
@@ -261,12 +276,11 @@ abstract class AbstractProvider implements ProviderInterface
             return $this->accessToken;
         }
 
-        $postKey = (1 === version_compare(ClientInterface::VERSION, '6')) ? 'form_params' : 'body';
 
-        $response = $this->getHttpClient()->post($this->getTokenUrl(), [
-            'headers' => ['Accept' => 'application/json'],
-            $postKey => $this->getTokenFields($code),
-        ]);
+
+        $response = $this->getHttpClient()
+            ->setUrl($this->getTokenUrl())
+            ->post($this->getTokenFields($code),['Accept' => 'application/json']);
 
         return $this->parseAccessToken($response->getBody());
     }
@@ -302,7 +316,7 @@ abstract class AbstractProvider implements ProviderInterface
     /**
      * Get the request instance.
      *
-     * @return \Symfony\Component\HttpFoundation\Request
+     * @return Request
      */
     public function getRequest()
     {
@@ -343,7 +357,7 @@ abstract class AbstractProvider implements ProviderInterface
     public function getName()
     {
         if (empty($this->name)) {
-            $this->name = strstr((new \ReflectionClass(get_class($this)))->getShortName(), 'Provider', true);
+            $this->name = strstr((new \ReflectionClass(get_class($this)))->getShortName(), 'AbstractProvider', true);
         }
 
         return $this->name;
@@ -408,10 +422,14 @@ abstract class AbstractProvider implements ProviderInterface
         if ($this->isStateless()) {
             return false;
         }
-
-        $state = $this->request->getSession()->get('state');
-
-        return !(strlen($state) > 0 && $this->request->get('state') === $state);
+        $cookie=$this->request->getCookieParams('EsLoginSession');
+        if(empty($cookie))
+        {
+            return false;
+        }
+        Cache::init();
+        $state=Cache::get($cookie);
+        return !(strlen($state) > 0);
     }
 
     /**
@@ -443,7 +461,6 @@ abstract class AbstractProvider implements ProviderInterface
         if (!is_array($body)) {
             $body = json_decode($body, true);
         }
-
         if (empty($body['access_token'])) {
             throw new AuthorizeFailedException('Authorize Failed: '.json_encode($body, JSON_UNESCAPED_UNICODE), $body);
         }
@@ -458,30 +475,22 @@ abstract class AbstractProvider implements ProviderInterface
      */
     protected function getCode()
     {
-        return $this->request->get('code');
+        return $this->request->getQueryParam('code');
     }
 
     /**
      * Get a fresh instance of the Guzzle HTTP client.
      *
-     * @return \GuzzleHttp\Client
+     * @return HttpClient
      */
     protected function getHttpClient()
     {
-        return new Client(self::$guzzleOptions);
+        //这儿后期加上httpclient的config
+        return new  HttpClient();
+        //return new Client(self::$guzzleOptions);
     }
 
-    /**
-     * Set options for Guzzle HTTP client.
-     *
-     * @param array $config
-     *
-     * @return array
-     */
-    public static function setGuzzleOptions($config = [])
-    {
-        return self::$guzzleOptions = $config;
-    }
+
 
     /**
      * Determine if the provider is operating with state.
@@ -500,7 +509,7 @@ abstract class AbstractProvider implements ProviderInterface
      */
     protected function isStateless()
     {
-        return !$this->request->hasSession() || $this->stateless;
+        return $this->stateless;
     }
 
     /**
@@ -540,20 +549,10 @@ abstract class AbstractProvider implements ProviderInterface
      */
     protected function makeState()
     {
-        if (!$this->request->hasSession()) {
-            return false;
-        }
-
         $state = sha1(uniqid(mt_rand(1, 1000000), true));
-        $session = $this->request->getSession();
-
-        if (is_callable([$session, 'put'])) {
-            $session->put('state', $state);
-        } elseif (is_callable([$session, 'set'])) {
-            $session->set('state', $state);
-        } else {
-            return false;
-        }
+        $this->response->setCookie('EsLoginSession',$state,1440);
+        Cache::init();
+        Cache::set($state,$state);
 
         return $state;
     }

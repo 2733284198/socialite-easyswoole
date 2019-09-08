@@ -107,9 +107,9 @@ class QQProvider extends AbstractProvider implements ProviderInterface
      */
     public function getAccessToken($code)
     {
-        $response = $this->getHttpClient()->get($this->getTokenUrl(), [
-            'query' => $this->getTokenFields($code),
-        ]);
+        $response = $this->getHttpClient()->setUrl($this->getTokenUrl())
+            ->setQuery($this->getTokenFields($code))
+            ->get();
 
         return $this->parseAccessToken($response->getBody()->getContents());
     }
@@ -162,7 +162,9 @@ class QQProvider extends AbstractProvider implements ProviderInterface
             'oauth_consumer_key' => $this->clientId,
         ];
 
-        $response = $this->getHttpClient()->get($this->baseUrl.'/user/get_user_info?'.http_build_query($queries));
+        $response = $this->getHttpClient()
+            ->setUrl($this->baseUrl.'/user/get_user_info?'.http_build_query($queries))
+            ->get();
 
         return json_decode($this->removeCallback($response->getBody()->getContents()), true);
     }

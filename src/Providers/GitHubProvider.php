@@ -44,16 +44,33 @@ class GitHubProvider extends AbstractProvider implements ProviderInterface
         return 'https://github.com/login/oauth/access_token';
     }
 
+    public function getAccessToken($code)
+    {
+        $response =$this->getHttpClient()
+            ->setUrl($this->getTokenUrl())
+            ->setQuery($this->getTokenFields($code))
+            ->get(['Accept' => 'application/json']);
+
+        return $this->parseAccessToken($response->getBody());
+    }
+
+    protected function getTokenFields($code)
+    {
+        return array_filter([
+            'client_id' => $this->clientId,
+            'client_secret' => $this->clientSecret,
+            'code' => $code,
+        ]);
+    }
+
     /**
      * {@inheritdoc}
      */
     protected function getUserByToken(AccessTokenInterface $token)
     {
         $userUrl = 'https://api.github.com/user?access_token='.$token->getToken();
+        $response = $this->getHttpClient()->setUrl($userUrl)->get($this->getRequestOptions());
 
-        $response = $this->getHttpClient()->get(
-            $userUrl, $this->getRequestOptions()
-        );
 
         $user = json_decode($response->getBody(), true);
 
@@ -76,9 +93,8 @@ class GitHubProvider extends AbstractProvider implements ProviderInterface
         $emailsUrl = 'https://api.github.com/user/emails?access_token='.$token->getToken();
 
         try {
-            $response = $this->getHttpClient()->get(
-                $emailsUrl, $this->getRequestOptions()
-            );
+            $response = $this->getHttpClient()->setUrl($emailsUrl)->get($this->getRequestOptions());
+
         } catch (Exception $e) {
             return;
         }
@@ -113,9 +129,7 @@ class GitHubProvider extends AbstractProvider implements ProviderInterface
     protected function getRequestOptions()
     {
         return [
-            'headers' => [
                 'Accept' => 'application/vnd.github.v3+json',
-            ],
         ];
     }
 }

@@ -84,6 +84,7 @@ class WeiboProvider extends AbstractProvider implements ProviderInterface
         return parent::getTokenFields($code) + ['grant_type' => 'authorization_code'];
     }
 
+
     /**
      * Get the raw user for the given access token.
      *
@@ -93,15 +94,13 @@ class WeiboProvider extends AbstractProvider implements ProviderInterface
      */
     protected function getUserByToken(AccessTokenInterface $token)
     {
-        $response = $this->getHttpClient()->get($this->baseUrl.'/'.$this->version.'/users/show.json', [
-            'query' => [
+        $response = $this->getHttpClient()
+            ->setUrl($this->baseUrl.'/'.$this->version.'/users/show.json')
+            ->setQuery([
                 'uid' => $token['uid'],
                 'access_token' => $token->getToken(),
-            ],
-            'headers' => [
-                'Accept' => 'application/json',
-            ],
-        ]);
+            ])
+            ->get(['Accept' => 'application/json']);
 
         return json_decode($response->getBody(), true);
     }

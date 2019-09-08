@@ -94,10 +94,11 @@ class WeChatProvider extends AbstractProvider implements ProviderInterface
      */
     public function getAccessToken($code)
     {
-        $response = $this->getHttpClient()->get($this->getTokenUrl(), [
-            'headers' => ['Accept' => 'application/json'],
-            'query' => $this->getTokenFields($code),
-        ]);
+
+        $response =$this->getHttpClient()
+            ->setUrl($this->getTokenUrl())
+            ->setQuery($this->getTokenFields($code))
+            ->get(['Accept' => 'application/json']);
 
         return $this->parseAccessToken($response->getBody());
     }
@@ -174,13 +175,13 @@ class WeChatProvider extends AbstractProvider implements ProviderInterface
 
         $language = $this->withCountryCode ? null : (isset($this->parameters['lang']) ? $this->parameters['lang'] : 'zh_CN');
 
-        $response = $this->getHttpClient()->get($this->baseUrl.'/userinfo', [
-            'query' => array_filter([
+
+        $response =$this->getHttpClient()->setUrl($this->baseUrl.'/userinfo')->setQuery(
+            array_filter([
                 'access_token' => $token->getToken(),
                 'openid' => $token['openid'],
                 'lang' => $language,
-            ]),
-        ]);
+            ]))->get();
 
         return json_decode($response->getBody(), true);
     }
