@@ -11,20 +11,21 @@
 </p>
 
 
-<p align="center">Socialite is an OAuth2 Authentication tool. It is inspired by <a href="https://github.com/laravel/socialite">laravel/socialite</a>, You can easily use it in any PHP project.</p>
+<p align="center">基于 <a href="https://github.com/overtrue/socialite">overtrue/socialite</a>改造的,适用于easyswoole的第三方登录组件，现已支持wechat,qq,weibo,github,facebook</p>
 
-# Requirement
+# 依赖
 
 ```
 PHP >= 7.0
+swoole >=4.4.0
 ```
-# Installation
+# 安装
 
 ```shell
-$ composer require "xbing2002/socialite"
+$ composer require "xbing2002/socialite" "1.0"
 ```
 
-# Usage
+# 使用说明
 
 
 `authorize.php`:
@@ -35,7 +36,7 @@ $ composer require "xbing2002/socialite"
 use Overtrue\Socialite\SocialiteManager;
 
 $config = [
-    'github' => [
+    'wechat' => [
         'client_id'     => 'your-app-id',
         'client_secret' => 'your-app-secret',
         'redirect'      => 'http://localhost/socialite/callback.php',
@@ -44,9 +45,8 @@ $config = [
 
 $socialite = new SocialiteManager($config);
 
-$response = $socialite->driver('github')->redirect();
+$socialite->driver('wechat')->redirect();
 
-echo $response;// or $response->send();
 ```
 
 `callback.php`:
@@ -57,7 +57,7 @@ echo $response;// or $response->send();
 use Overtrue\Socialite\SocialiteManager;
 
 $config = [
-    'github' => [
+    'wechat' => [
         'client_id' => 'your-app-id',
         'client_secret' => 'your-app-secret',
         'redirect' => 'http://localhost/socialite/callback.php',
@@ -66,26 +66,25 @@ $config = [
 
 $socialite = new SocialiteManager($config);
 
-$user = $socialite->driver('github')->user();
+$user = $socialite->driver('wechat')->user();
 
-$user->getId();        // 1472352
-$user->getNickname();  // "overtrue"
-$user->getUsername();  // "overtrue"
-$user->getName();      // "安正超"
-$user->getEmail();     // "anzhengchao@gmail.com"
-$user->getProviderName(); // GitHub
+$user->getId();        // openid
+$user->getNickname();  // "昵称"
+$user->getName();      // "昵称"
+$user->getAvatar();     // 头像
+$user->getProviderName(); // WeChat
 ...
 ```
 
-### Configuration
+### 配置项
 
-Now we support the following sites:
+现在支持:
 
-`facebook`, `github`, `google`, `linkedin`, `outlook`, `weibo`, `taobao`, `qq`, `wechat`, `douyin`, and `douban`.
+`facebook`, `github`, `weibo`,  `qq`, `wechat`.
 
-Each driver uses the same configuration keys: `client_id`, `client_secret`, `redirect`.
+每一个登录平台的配置都是一样的，只需要配置: `client_id`, `client_secret`, `redirect`.
 
-Example:
+例子:
 ```
 ...
   'weibo' => [
@@ -98,17 +97,20 @@ Example:
 
 ### Scope
 
-Before redirecting the user, you may also set "scopes" on the request using the scope method. This method will overwrite all existing scopes:
+有些登录平台可以在跳转之前设置Scope:
 
 ```php
 $response = $socialite->driver('github')
                 ->scopes(['scope1', 'scope2'])->redirect();
 
 ```
+> WeChat scopes:
+- `snsapi_base`, `snsapi_userinfo` - 用于公众号登录.
+- `snsapi_login` - 用户web登录.
 
-### Redirect URL
+### 跳转链接
 
-You may also want to dynamicly set `redirect`，you can use the following methods to change the `redirect` URL:
+当然你也可以动态设置跳转链接:
 
 ```php
 $socialite->redirect($url);
@@ -118,13 +120,10 @@ $socialite->withRedirectUrl($url)->redirect();
 $socialite->setRedirectUrl($url)->redirect();
 ```
 
-> WeChat scopes:
-- `snsapi_base`, `snsapi_userinfo` - Used to Media Platform Authentication.
-- `snsapi_login` - Used to web Authentication.
 
-### Additional parameters
+### 自定义参数
 
-To include any optional parameters in the request, call the with method with an associative array:
+如果存在一些自定义参数，请用with方法
 
 ```php
 $response = $socialite->driver('google')
@@ -164,7 +163,7 @@ $user = $socialite->driver('weibo')->user();
 }
 ```
 
-You can fetch the user attribute as a array keys like these:
+你可以通过数组方式获取用户属性:
 
 ```php
 $user['id'];        // 1472352
@@ -174,7 +173,7 @@ $user['email'];     // "anzhengchao@gmail.com"
 ...
 ```
 
-Or using the method:
+或者通过对象方式获取:
 
 ```php
 $user->getId();
@@ -187,78 +186,23 @@ $user->getToken();// or $user->getAccessToken()
 $user->getProviderName(); // GitHub/Google/Facebook...
 ```
 
-#### Get original response from OAuth API
+#### 你也可以直接获取各登录平台的原始返回数据
 
-The `$user->getOriginal()` method will return an array of the API raw response.
+`$user->getOriginal()` 
 
-#### Get access token Object
+#### 获取access token 对象
 
-You can get the access token instance of current session by call `$user->getToken()` or `$user->getAccessToken()` or `$user['token']` .
+`$user->getToken()`
+`$user->getAccessToken()`
+`$user['token']` 
 
 
-### Get user with access token
+### 可以通过access token 获取用户信息
 
 ```php
 $accessToken = new AccessToken(['access_token' => $accessToken]);
 $user = $socialite->user($accessToken);
 ```
-
-
-### Custom Session or Request instance.
-
-You can set the request with your custom `Request` instance which instanceof `Symfony\Component\HttpFoundation\Request` before you call `driver` method.
-
-
-```php
-
-$request = new Request(); // or use AnotherCustomRequest.
-
-$socialite = new SocialiteManager($config, $request);
-```
-
-Or set request to `SocialiteManager` instance:
-
-```php
-$socialite->setRequest($request);
-```
-
-You can get the request from the `SocialiteManager` instance by `getRequest()`:
-
-```php
-$request = $socialite->getRequest();
-```
-
-#### Set custom session manager.
-
-By default, the `SocialiteManager` uses the `Symfony\Component\HttpFoundation\Session\Session` instance as session manager, you can change it as follows:
-
-```php
-$session = new YourCustomSessionManager();
-$socialite->getRequest()->setSession($session);
-```
-
-> Your custom session manager must be implement the [`Symfony\Component\HttpFoundation\Session\SessionInterface`](http://api.symfony.com/3.0/Symfony/Component/HttpFoundation/Session/SessionInterface.html).
-
-Enjoy it! :heart:
-
-# Reference
-
-- [Google - OpenID Connect](https://developers.google.com/identity/protocols/OpenIDConnect)
-- [Facebook - Graph API](https://developers.facebook.com/docs/graph-api)
-- [Linkedin - Authenticating with OAuth 2.0](https://developer.linkedin.com/docs/oauth2)
-- [微博 - OAuth 2.0 授权机制说明](http://open.weibo.com/wiki/%E6%8E%88%E6%9D%83%E6%9C%BA%E5%88%B6%E8%AF%B4%E6%98%8E)
-- [QQ - OAuth 2.0 登录QQ](http://wiki.connect.qq.com/oauth2-0%E7%AE%80%E4%BB%8B)
-- [微信公众平台 - OAuth文档](http://mp.weixin.qq.com/wiki/9/01f711493b5a02f24b04365ac5d8fd95.html)
-- [微信开放平台 - 网站应用微信登录开发指南](https://open.weixin.qq.com/cgi-bin/showdocument?action=dir_list&t=resource/res_list&verify=1&id=open1419316505&token=&lang=zh_CN)
-- [微信开放平台 - 代公众号发起网页授权](https://open.weixin.qq.com/cgi-bin/showdocument?action=dir_list&t=resource/res_list&verify=1&id=open1419318590&token=&lang=zh_CN)
-- [豆瓣 - OAuth 2.0 授权机制说明](http://developers.douban.com/wiki/?title=oauth2)
-- [抖音 - 网站应用开发指南](http://open.douyin.com/platform/doc)
-
-## PHP 扩展包开发
-
-> 想知道如何从零开始构建 PHP 扩展包？
->
-> 请关注我的实战课程，我会在此课程中分享一些扩展开发经验 —— [《PHP 扩展包实战教程 - 从入门到发布》](https://learnku.com/courses/creating-package)
 
 # License
 
