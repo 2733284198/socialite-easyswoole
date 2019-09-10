@@ -15,8 +15,6 @@
         "easyswoole/cache": "^1.1"
     },
     "require-dev": {
-        "mockery/mockery": "~1.2",
-        "phpunit/phpunit": "~6",
         "easyswoole/swoole-ide-helper": "^1.0"
     },
     "repositories": {
